@@ -19,8 +19,9 @@ const STUDENTS_KEY = 'question_students_v1';
 const USER_PREFS_KEY = 'question_user_prefs';
 const STUDENT_SESSION_KEY = 'question_student_session';
 const TEACHER_SESSION_KEY = 'question_teacher_session';
+const TEACHER_PASSWORD_KEY = 'question_teacher_password';
 const MAX_TICKETS_PER_STUDENT = 3;
-const TEACHER_PASSWORD = '066';
+const DEFAULT_TEACHER_PASSWORD = '066';
 
 // ============================================
 // Firebase Data Cache
@@ -79,6 +80,9 @@ function initializeFirebaseData() {
   }, (error) => {
     console.error('Students sync error:', error);
   });
+  
+  // 先生パスワードの同期
+  loadTeacherPasswordFromFirebase();
   
   // 初回データ読み込み完了を待つ
   Promise.all([
@@ -336,6 +340,101 @@ function saveUserPrefs(prefs) {
   } catch (e) {
     console.error('Failed to save user prefs:', e);
   }
+}
+
+// ============================================
+// Teacher Password Management
+// ============================================
+
+let teacherPasswordCache = null;
+
+/**
+ * 先生パスワードを取得
+ */
+function getTeacherPassword() {
+  if (teacherPasswordCache !== null) {
+    return teacherPasswordCache;
+  }
+  
+  // Firebaseから取得を試みる（キャッシュがない場合はlocalStorageから）
+  const localPassword = localStorage.getItem(TEACHER_PASSWORD_KEY);
+  teacherPasswordCache = localPassword || DEFAULT_TEACHER_PASSWORD;
+  return teacherPasswordCache;
+}
+
+/**
+ * 先生パスワードを設定
+ */
+async function setTeacherPassword(newPassword) {
+  if (isFirebaseConfigured() && database) {
+    try {
+      await database.ref('settings/teacherPassword').set(newPassword);
+    } catch (error) {
+      console.error('Failed to save password to Firebase:', error);
+    }
+  }
+  localStorage.setItem(TEACHER_PASSWORD_KEY, newPassword);
+  teacherPasswordCache = newPassword;
+}
+
+/**
+ * Firebaseから先生パスワードを読み込む
+ */
+function loadTeacherPasswordFromFirebase() {
+  if (isFirebaseConfigured() && database) {
+    database.ref('settings/teacherPassword').on('value', (snapshot) => {
+      const password = snapshot.val();
+      if (password) {
+        teacherPasswordCache = password;
+        localStorage.setItem(TEACHER_PASSWORD_KEY, password);
+      }
+    });
+  }
+}
+
+/**
+ * パスワード変更モーダルを表示
+ */
+function showPasswordChangeModal() {
+  document.getElementById('current-password').value = '';
+  document.getElementById('new-password').value = '';
+  document.getElementById('confirm-password').value = '';
+  document.getElementById('password-change-modal').classList.remove('hidden');
+}
+
+/**
+ * パスワード変更モーダルを閉じる
+ */
+function closePasswordChangeModal() {
+  document.getElementById('password-change-modal').classList.add('hidden');
+}
+
+/**
+ * 先生パスワードを変更
+ */
+async function changeTeacherPassword() {
+  const currentPassword = document.getElementById('current-password').value;
+  const newPassword = document.getElementById('new-password').value;
+  const confirmPassword = document.getElementById('confirm-password').value;
+  
+  if (currentPassword !== getTeacherPassword()) {
+    showToast('現在のパスワードが違います', 'error');
+    return;
+  }
+  
+  if (!newPassword) {
+    showToast('新しいパスワードを入力してください', 'error');
+    return;
+  }
+  
+  if (newPassword !== confirmPassword) {
+    showToast('新しいパスワードが一致しません', 'error');
+    return;
+  }
+  
+  await setTeacherPassword(newPassword);
+  closePasswordChangeModal();
+  showToast('パスワードを変更しました');
 }
 
 // ============================================
@@ -722,7 +821,7 @@ function renderStudentTicketList() {
     const purposeText = ticket.purpose === 'grading' ? '採点' : '質問';
     const statusClass = `badge-${ticket.status}`;
     const statusText = { submitted: '未解決', done: '解決済み' }[ticket.status] || ticket.status;
-    const hasAnswer = ticket.status === 'done' && (ticket.teacherAnswer || ticket.teacherHint || (ticket.teacherImages && ticket.teacherImages.length > 0));
+    const hasAnswer = ticket.status === 'done';
     const subjectClass = `subject-${ticket.subject}`;
     
     return `
@@ -830,36 +929,13 @@ function renderStudentDetail(id) {
       </div>
     ` : ''}
     
-    <!-- 先生からの回答 -->
+    <!-- ステータス -->
     <div class="teacher-answer-card">
-      <div class="teacher-answer-title">先生からの回答</div>
+      <div class="teacher-answer-title">対応状況</div>
       ${ticket.status === 'done' ? `
-        ${ticket.teacherHint ? `
-          <div class="teacher-answer-content">${escapeHtml(ticket.teacherHint)}</div>
-        ` : ''}
-        ${ticket.teacherAnswer ? `
-          <div style="margin-top: 16px;">
-            <div class="teacher-answer-title">解答</div>
-            <div class="teacher-answer-content">${escapeHtml(ticket.teacherAnswer)}</div>
-          </div>
-        ` : ''}
-        ${(ticket.teacherImages || []).length > 0 ? `
-          <div style="margin-top: 16px;">
-            <div class="teacher-answer-title">先生からの画像（${ticket.teacherImages.length}枚）</div>
-            <div class="detail-gallery">
-              ${ticket.teacherImages.map(src => `
-                <div class="detail-gallery-item">
-                  <img src="${src}" alt="先生画像" data-full="${src}" onclick="openDetailImageModal(this.dataset.full)">
-                </div>
-              `).join('')}
-            </div>
-          </div>
-        ` : ''}
-        ${!ticket.teacherAnswer && !ticket.teacherHint && !(ticket.teacherImages || []).length ? `
-          <div class="teacher-answer-empty">回答はありますが、コメントは入力されていません</div>
-        ` : ''}
+        <div class="teacher-answer-content" style="color: var(--color-success);">対応完了</div>
       ` : `
-        <div class="teacher-answer-empty">まだ回答がありません</div>
+        <div class="teacher-answer-empty">対応待ち</div>
       `}
     </div>
   `;
@@ -1006,8 +1082,7 @@ function setupStudentEventListeners() {
  * 画像アップロード処理（複数対応）
  */
 function handleImageUpload(files, type) {
-  const imageArray = type === 'question' ? questionImages : 
-                     type === 'answer' ? answerImages : teacherImages;
+  const imageArray = type === 'question' ? questionImages : answerImages;
   
   Array.from(files).forEach(file => {
     const reader = new FileReader();
@@ -1025,8 +1100,7 @@ function handleImageUpload(files, type) {
  * 画像枚数表示を更新
  */
 function updateImageCount(type) {
-  const images = type === 'question' ? questionImages : 
-                 type === 'answer' ? answerImages : teacherImages;
+  const images = type === 'question' ? questionImages : answerImages;
   const countEl = document.getElementById(`count-${type}Images`);
   
   if (!countEl) return;
@@ -1046,8 +1120,7 @@ function renderImagePreviews(type) {
   const container = document.getElementById(`preview-${type}Images`);
   if (!container) return;
   
-  const images = type === 'question' ? questionImages : 
-                 type === 'answer' ? answerImages : teacherImages;
+  const images = type === 'question' ? questionImages : answerImages;
   
   container.innerHTML = images.map((src, index) => `
     <div class="image-preview-item">
@@ -1072,8 +1145,7 @@ function renderImagePreviews(type) {
  * インデックスで画像拡大モーダルを開く
  */
 function openImageModalByIndex(type, index) {
-  const images = type === 'question' ? questionImages : 
-                 type === 'answer' ? answerImages : teacherImages;
+  const images = type === 'question' ? questionImages : answerImages;
   const modal = document.getElementById('image-modal');
   const img = document.getElementById('image-modal-img');
   img.src = images[index];
@@ -1105,8 +1177,6 @@ function removeImage(type, index) {
     questionImages.splice(index, 1);
   } else if (type === 'answer') {
     answerImages.splice(index, 1);
-  } else if (type === 'teacher') {
-    teacherImages.splice(index, 1);
   }
   renderImagePreviews(type);
   updateImageCount(type);
@@ -1173,9 +1243,7 @@ function collectFormData() {
     questionReason: document.getElementById('input-questionReason').value.trim(),
     questionImages: [...questionImages],
     answerImages: [...answerImages],
-    teacherAnswer: '',
-    teacherHint: '',
-    teacherImages: [],
+    teacherMemo: '',
     doneAt: null
   };
 }
@@ -1265,7 +1333,7 @@ async function submitTicket() {
 function teacherLogin() {
   const password = document.getElementById('teacher-password').value;
   
-  if (password === TEACHER_PASSWORD) {
+  if (password === getTeacherPassword()) {
     setTeacherSession(true);
     showToast('ログインしました');
     navigateTo('teacher');
@@ -1536,27 +1604,87 @@ async function deleteAllData() {
 // Teacher List Page
 // ============================================
 
+// 並び順: 'asc' = 古い順（デフォルト）, 'desc' = 新しい順
+let teacherListSortOrder = 'asc';
+
+/**
+ * 並び順を切り替え
+ */
+function toggleSortOrder() {
+  teacherListSortOrder = teacherListSortOrder === 'asc' ? 'desc' : 'asc';
+  updateSortButton();
+  renderTeacherList();
+}
+
+/**
+ * 並び順ボタンの表示を更新
+ */
+function updateSortButton() {
+  const btn = document.getElementById('sort-order-btn');
+  if (btn) {
+    if (teacherListSortOrder === 'asc') {
+      btn.innerHTML = '<span class="sort-icon">↑</span> 古い順';
+    } else {
+      btn.innerHTML = '<span class="sort-icon">↓</span> 新しい順';
+    }
+  }
+}
+
+/**
+ * クラスフィルタ変更時に生徒フィルタを更新
+ */
+function onTeacherClassFilterChange() {
+  const classFilter = document.getElementById('filter-class').value;
+  const studentSelect = document.getElementById('filter-student');
+  
+  // 生徒フィルタをリセット
+  studentSelect.innerHTML = '<option value="">全生徒</option>';
+  
+  if (classFilter) {
+    // 選択されたクラスの生徒を取得
+    const students = loadStudents().filter(s => s.className === classFilter);
+    students.sort((a, b) => a.initials.localeCompare(b.initials));
+    
+    students.forEach(student => {
+      const option = document.createElement('option');
+      option.value = student.initials;
+      option.textContent = student.initials;
+      studentSelect.appendChild(option);
+    });
+  }
+  
+  renderTeacherList();
+}
+
 /**
  * 先生一覧を描画
  */
 function renderTeacherList() {
   const tickets = loadTickets();
   const classFilter = document.getElementById('filter-class').value;
+  const studentFilter = document.getElementById('filter-student').value;
   const subjectFilter = document.getElementById('filter-subject').value;
   const statusFilter = document.getElementById('filter-status').value;
   
   let filtered = tickets.filter(t => {
     if (classFilter && t.className !== classFilter) return false;
+    if (studentFilter && t.initials !== studentFilter) return false;
     if (subjectFilter && t.subject !== subjectFilter) return false;
     if (statusFilter && t.status !== statusFilter) return false;
     return true;
   });
   
+  // 並び順: 古い順（asc）または新しい順（desc）
   filtered.sort((a, b) => {
     const statusOrder = { submitted: 0, draft: 1, done: 2 };
     const statusDiff = (statusOrder[a.status] || 2) - (statusOrder[b.status] || 2);
     if (statusDiff !== 0) return statusDiff;
-    return (b.createdAt || 0) - (a.createdAt || 0);
+    
+    if (teacherListSortOrder === 'asc') {
+      return (a.createdAt || 0) - (b.createdAt || 0); // 古い順
+    } else {
+      return (b.createdAt || 0) - (a.createdAt || 0); // 新しい順
+    }
   });
   
   const container = document.getElementById('teacher-list');
@@ -1610,7 +1738,6 @@ function renderTeacherList() {
 // ============================================
 
 let currentDetailTicketId = null;
-let teacherImages = [];
 
 /**
  * 先生詳細画面を描画
@@ -1625,9 +1752,6 @@ function renderTeacherDetail(id) {
     return;
   }
   
-  // 既存の先生画像を読み込む
-  teacherImages = [...(ticket.teacherImages || [])];
-  
   const isDone = ticket.status === 'done';
   const purposeText = ticket.purpose === 'grading' ? '採点をお願いする' : '質問する';
   const purposeClass = ticket.purpose === 'grading' ? 'badge-grading' : 'badge-question';
@@ -1635,9 +1759,8 @@ function renderTeacherDetail(id) {
   
   const content = document.getElementById('teacher-detail-content');
   content.innerHTML = `
-    <!-- 生徒情報 -->
-    <div class="detail-section">
-      <div class="detail-section-title">基本情報</div>
+    <div class="detail-wrapper">
+      <!-- 基本情報 -->
       <div class="detail-row">
         <span class="detail-label">クラス</span>
         <span class="detail-value">${escapeHtml(ticket.className)}</span>
@@ -1664,25 +1787,23 @@ function renderTeacherDetail(id) {
           <span class="detail-value">${formatDateTime(ticket.doneAt)}</span>
         </div>
       ` : ''}
-    </div>
-    
-    ${ticket.purpose === 'question' ? `
-    <!-- 生徒の確認事項 -->
-    <div class="detail-highlight">
-      <div class="detail-highlight-title">確認したこと</div>
-      <div class="detail-checks">
-        ${(ticket.checkedMaterials || []).map(m => `<span class="detail-check-item">${escapeHtml(m)}</span>`).join('')}
-      </div>
-    </div>
-    <div class="detail-highlight">
-      <div class="detail-highlight-title">質問内容</div>
-      <div class="detail-highlight-content">${escapeHtml(ticket.questionReason || '')}</div>
-    </div>
-    ` : ''}
-    
-    <!-- 問題画像 -->
-    ${(ticket.questionImages || []).length > 0 ? `
-      <div class="detail-section">
+      
+      ${ticket.purpose === 'question' ? `
+        <!-- 確認事項 -->
+        <div class="detail-divider"></div>
+        <div class="detail-section-title">確認したこと</div>
+        <div class="detail-checks">
+          ${(ticket.checkedMaterials || []).map(m => `<span class="detail-check-item">${escapeHtml(m)}</span>`).join('')}
+        </div>
+        
+        <!-- 質問内容 -->
+        <div class="detail-section-title" style="margin-top: 16px;">質問内容</div>
+        <div class="detail-highlight-content">${escapeHtml(ticket.questionReason || '')}</div>
+      ` : ''}
+      
+      <!-- 問題画像 -->
+      ${(ticket.questionImages || []).length > 0 ? `
+        <div class="detail-divider"></div>
         <div class="detail-section-title">問題画像（${ticket.questionImages.length}枚）</div>
         <div class="detail-gallery">
           ${ticket.questionImages.map(src => `
@@ -1691,12 +1812,11 @@ function renderTeacherDetail(id) {
             </div>
           `).join('')}
         </div>
-      </div>
-    ` : ''}
-    
-    <!-- 解答画像 -->
-    ${(ticket.answerImages || []).length > 0 ? `
-      <div class="detail-section">
+      ` : ''}
+      
+      <!-- 解答画像 -->
+      ${(ticket.answerImages || []).length > 0 ? `
+        <div class="detail-divider"></div>
         <div class="detail-section-title">解答・解説画像（${ticket.answerImages.length}枚）</div>
         <div class="detail-gallery">
           ${ticket.answerImages.map(src => `
@@ -1705,55 +1825,26 @@ function renderTeacherDetail(id) {
             </div>
           `).join('')}
         </div>
-      </div>
-    ` : ''}
-    
-    <!-- 先生入力 -->
-    <div class="teacher-input-section ${isDone ? 'readonly-section' : ''}">
-      <label class="form-label">解説・ヒント</label>
-      <textarea id="input-teacherHint" class="form-textarea" rows="3" 
-        placeholder="解説やヒントを入力してください" ${isDone ? 'readonly' : ''}>${escapeHtml(ticket.teacherHint || '')}</textarea>
-    </div>
-    
-    <div class="teacher-input-section ${isDone ? 'readonly-section' : ''}">
-      <label class="form-label">解答</label>
-      <textarea id="input-teacherAnswer" class="form-textarea" rows="3" 
-        placeholder="解答を入力してください" ${isDone ? 'readonly' : ''}>${escapeHtml(ticket.teacherAnswer || '')}</textarea>
-    </div>
-    
-    <!-- 先生画像添付 -->
-    <div class="teacher-input-section ${isDone ? 'readonly-section' : ''}">
-      <label class="form-label">画像を添付（複数枚可）</label>
-      ${!isDone ? `
-        <div class="image-upload-area">
-          <input type="file" id="input-teacherImages" accept="image/*" capture="environment" multiple class="file-input">
-          <label for="input-teacherImages" class="file-label">
-            <svg class="file-icon" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-              <rect x="3" y="3" width="18" height="18" rx="2"/>
-              <circle cx="8.5" cy="8.5" r="1.5"/>
-              <path d="M21 15l-5-5L5 21"/>
-            </svg>
-            <span>タップして撮影/選択</span>
-            <span class="file-label-hint">複数枚を一度に選択できます</span>
-          </label>
-        </div>
       ` : ''}
-      <div id="preview-teacherImages" class="image-preview-container"></div>
-      <div id="count-teacherImages" class="hidden"></div>
+      
+      <!-- 先生メモ -->
+      <div class="detail-divider"></div>
+      <div class="detail-section-title">メモ</div>
+      <textarea id="input-teacherMemo" class="form-textarea" rows="3" 
+        placeholder="メモを入力" ${isDone ? 'readonly' : ''}>${escapeHtml(ticket.teacherMemo || '')}</textarea>
     </div>
   `;
   
-  // 既存の画像プレビューを表示
-  renderImagePreviews('teacher');
-  updateImageCount('teacher');
-  
-  // 画像入力のイベントリスナー
+  // メモの自動保存（入力中に保存）
   if (!isDone) {
-    const teacherImagesInput = document.getElementById('input-teacherImages');
-    if (teacherImagesInput) {
-      teacherImagesInput.onchange = function(e) {
-        handleImageUpload(e.target.files, 'teacher');
-        this.value = '';
+    const memoInput = document.getElementById('input-teacherMemo');
+    if (memoInput) {
+      let saveTimeout;
+      memoInput.oninput = function() {
+        clearTimeout(saveTimeout);
+        saveTimeout = setTimeout(() => {
+          saveTeacherMemo();
+        }, 1000);
       };
     }
   }
@@ -1765,25 +1856,23 @@ function renderTeacherDetail(id) {
     `;
   } else {
     footer.innerHTML = `
-      <button class="btn btn-outline" onclick="saveTeacherInput()">保存</button>
-      <button class="btn btn-accent" onclick="completeTicket()">対応完了</button>
+      <button class="btn btn-primary" onclick="completeTicket()">対応完了</button>
     `;
   }
 }
 
 /**
- * 先生入力を保存
+ * 先生メモを保存（自動保存用）
  */
-async function saveTeacherInput() {
+async function saveTeacherMemo() {
   const ticket = getTicketById(currentDetailTicketId);
   if (!ticket) return;
   
-  ticket.teacherAnswer = document.getElementById('input-teacherAnswer').value;
-  ticket.teacherHint = document.getElementById('input-teacherHint').value;
-  ticket.teacherImages = [...teacherImages];
-  
-  await upsertTicket(ticket);
-  showToast('保存しました');
+  const memoInput = document.getElementById('input-teacherMemo');
+  if (memoInput) {
+    ticket.teacherMemo = memoInput.value;
+    await upsertTicket(ticket);
+  }
 }
 
 /**
@@ -1793,9 +1882,10 @@ async function completeTicket() {
   const ticket = getTicketById(currentDetailTicketId);
   if (!ticket) return;
   
-  ticket.teacherAnswer = document.getElementById('input-teacherAnswer').value;
-  ticket.teacherHint = document.getElementById('input-teacherHint').value;
-  ticket.teacherImages = [...teacherImages];
+  const memoInput = document.getElementById('input-teacherMemo');
+  if (memoInput) {
+    ticket.teacherMemo = memoInput.value;
+  }
   ticket.status = 'done';
   ticket.doneAt = Date.now();
   
