@@ -2,7 +2,7 @@
   質問受付予約Web - app.js
   アプリケーションのロジックを管理。
   - ルーティング（URLハッシュベース）
-  - データ管理（localStorage）
+  - データ管理（Firebase Realtime Database + localStorage フォールバック）
   - 生徒・先生ログイン機能
   - 生徒管理機能（先生用）
   - 生徒画面の入力・保存・送信処理
@@ -23,48 +23,172 @@ const MAX_TICKETS_PER_STUDENT = 3;
 const TEACHER_PASSWORD = '066';
 
 // ============================================
+// Firebase Data Cache
+// ============================================
+let ticketsCache = [];
+let studentsCache = [];
+let firebaseReady = false;
+let dataLoadedCallbacks = [];
+
+/**
+ * Firebase初期化とリアルタイムリスナー設定
+ */
+function initializeFirebaseData() {
+  const loadingScreen = document.getElementById('loading-screen');
+  
+  if (!isFirebaseConfigured()) {
+    console.warn('Firebase not configured. Using localStorage fallback.');
+    ticketsCache = loadTicketsFromLocal();
+    studentsCache = loadStudentsFromLocal();
+    firebaseReady = true;
+    if (loadingScreen) loadingScreen.classList.add('hidden');
+    triggerDataLoadedCallbacks();
+    return;
+  }
+  
+  if (!initFirebase()) {
+    console.error('Firebase initialization failed. Using localStorage fallback.');
+    ticketsCache = loadTicketsFromLocal();
+    studentsCache = loadStudentsFromLocal();
+    firebaseReady = true;
+    if (loadingScreen) loadingScreen.classList.add('hidden');
+    triggerDataLoadedCallbacks();
+    return;
+  }
+  
+  // チケットのリアルタイムリスナー
+  database.ref('tickets').on('value', (snapshot) => {
+    const data = snapshot.val();
+    ticketsCache = data ? Object.values(data) : [];
+    console.log('Tickets synced:', ticketsCache.length);
+    if (firebaseReady) {
+      refreshCurrentView();
+    }
+  }, (error) => {
+    console.error('Tickets sync error:', error);
+  });
+  
+  // 生徒のリアルタイムリスナー
+  database.ref('students').on('value', (snapshot) => {
+    const data = snapshot.val();
+    studentsCache = data ? Object.values(data) : [];
+    console.log('Students synced:', studentsCache.length);
+    if (firebaseReady) {
+      refreshCurrentView();
+    }
+  }, (error) => {
+    console.error('Students sync error:', error);
+  });
+  
+  // 初回データ読み込み完了を待つ
+  Promise.all([
+    database.ref('tickets').once('value'),
+    database.ref('students').once('value')
+  ]).then(() => {
+    firebaseReady = true;
+    console.log('Firebase data loaded');
+    if (loadingScreen) loadingScreen.classList.add('hidden');
+    triggerDataLoadedCallbacks();
+  }).catch((error) => {
+    console.error('Firebase data load error:', error);
+    ticketsCache = loadTicketsFromLocal();
+    studentsCache = loadStudentsFromLocal();
+    firebaseReady = true;
+    if (loadingScreen) loadingScreen.classList.add('hidden');
+    triggerDataLoadedCallbacks();
+  });
+}
+
+/**
+ * データ読み込み完了時のコールバック実行
+ */
+function triggerDataLoadedCallbacks() {
+  dataLoadedCallbacks.forEach(cb => cb());
+  dataLoadedCallbacks = [];
+}
+
+/**
+ * データ読み込み完了を待つ
+ */
+function waitForData(callback) {
+  if (firebaseReady) {
+    callback();
+  } else {
+    dataLoadedCallbacks.push(callback);
+  }
+}
+
+/**
+ * 現在の画面を更新（リアルタイム同期用）
+ */
+function refreshCurrentView() {
+  const hash = location.hash || '#';
+  if (hash === '#student-mypage') {
+    renderStudentMyPage();
+  } else if (hash === '#teacher') {
+    renderTeacherTickets();
+  } else if (hash.startsWith('#teacher-detail')) {
+    const id = new URLSearchParams(hash.split('?')[1]).get('id');
+    if (id) renderTeacherDetail(id);
+  } else if (hash === '#teacher-students') {
+    renderTeacherStudentsList();
+  }
+}
+
+// ============================================
 // Data Management - Tickets
 // ============================================
 
 /**
- * チケット一覧を読み込む
+ * localStorageからチケット読み込み（フォールバック用）
  */
-function loadTickets() {
+function loadTicketsFromLocal() {
   try {
     const data = localStorage.getItem(STORAGE_KEY);
     return data ? JSON.parse(data) : [];
   } catch (e) {
-    console.error('Failed to load tickets:', e);
+    console.error('Failed to load tickets from localStorage:', e);
     return [];
   }
 }
 
 /**
- * チケット一覧を保存する
+ * チケット一覧を取得（キャッシュから）
  */
-function saveTickets(tickets) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(tickets));
-  } catch (e) {
-    console.error('Failed to save tickets:', e);
-    showToast('保存に失敗しました', 'error');
-  }
+function loadTickets() {
+  return ticketsCache;
 }
 
 /**
  * チケットを追加または更新する
  */
-function upsertTicket(ticket) {
-  const tickets = loadTickets();
-  const index = tickets.findIndex(t => t.id === ticket.id);
+async function upsertTicket(ticket) {
+  const now = Date.now();
+  const existingIndex = ticketsCache.findIndex(t => t.id === ticket.id);
   
-  if (index >= 0) {
-    tickets[index] = { ...tickets[index], ...ticket, updatedAt: Date.now() };
+  if (existingIndex >= 0) {
+    ticket = { ...ticketsCache[existingIndex], ...ticket, updatedAt: now };
   } else {
-    tickets.push({ ...ticket, createdAt: Date.now(), updatedAt: Date.now() });
+    ticket = { ...ticket, createdAt: now, updatedAt: now };
   }
   
-  saveTickets(tickets);
+  if (isFirebaseConfigured() && database) {
+    try {
+      await database.ref('tickets/' + ticket.id).set(ticket);
+    } catch (error) {
+      console.error('Failed to save ticket to Firebase:', error);
+      showToast('保存に失敗しました', 'error');
+      throw error;
+    }
+  } else {
+    if (existingIndex >= 0) {
+      ticketsCache[existingIndex] = ticket;
+    } else {
+      ticketsCache.push(ticket);
+    }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(ticketsCache));
+  }
+  
   return ticket;
 }
 
@@ -72,8 +196,7 @@ function upsertTicket(ticket) {
  * IDでチケットを取得する
  */
 function getTicketById(id) {
-  const tickets = loadTickets();
-  return tickets.find(t => t.id === id) || null;
+  return ticketsCache.find(t => t.id === id) || null;
 }
 
 /**
@@ -91,8 +214,7 @@ function generateUUID() {
  * 生徒の未完了チケット数を取得
  */
 function getActiveTicketCount(studentId, excludeId = null) {
-  const tickets = loadTickets();
-  return tickets.filter(t => 
+  return ticketsCache.filter(t => 
     t.studentId === studentId && 
     t.status === 'submitted' &&
     t.id !== excludeId
@@ -104,70 +226,85 @@ function getActiveTicketCount(studentId, excludeId = null) {
 // ============================================
 
 /**
- * 生徒一覧を読み込む
+ * localStorageから生徒読み込み（フォールバック用）
  */
-function loadStudents() {
+function loadStudentsFromLocal() {
   try {
     const data = localStorage.getItem(STUDENTS_KEY);
     return data ? JSON.parse(data) : [];
   } catch (e) {
-    console.error('Failed to load students:', e);
+    console.error('Failed to load students from localStorage:', e);
     return [];
   }
 }
 
 /**
- * 生徒一覧を保存する
+ * 生徒一覧を取得（キャッシュから）
  */
-function saveStudents(students) {
-  try {
-    localStorage.setItem(STUDENTS_KEY, JSON.stringify(students));
-  } catch (e) {
-    console.error('Failed to save students:', e);
-    showToast('保存に失敗しました', 'error');
-  }
+function loadStudents() {
+  return studentsCache;
 }
 
 /**
  * 生徒を追加または更新する
  */
-function upsertStudent(student) {
-  const students = loadStudents();
-  const index = students.findIndex(s => s.id === student.id);
+async function upsertStudent(student) {
+  const existingIndex = studentsCache.findIndex(s => s.id === student.id);
   
-  if (index >= 0) {
-    students[index] = { ...students[index], ...student };
-  } else {
-    students.push({ ...student, id: generateUUID() });
+  if (existingIndex < 0 && !student.id) {
+    student.id = generateUUID();
   }
   
-  saveStudents(students);
+  if (isFirebaseConfigured() && database) {
+    try {
+      await database.ref('students/' + student.id).set(student);
+    } catch (error) {
+      console.error('Failed to save student to Firebase:', error);
+      showToast('保存に失敗しました', 'error');
+      throw error;
+    }
+  } else {
+    if (existingIndex >= 0) {
+      studentsCache[existingIndex] = { ...studentsCache[existingIndex], ...student };
+    } else {
+      studentsCache.push(student);
+    }
+    localStorage.setItem(STUDENTS_KEY, JSON.stringify(studentsCache));
+  }
+  
   return student;
 }
 
 /**
  * 生徒を削除する
  */
-function deleteStudent(studentId) {
-  const students = loadStudents();
-  const filtered = students.filter(s => s.id !== studentId);
-  saveStudents(filtered);
+async function deleteStudent(studentId) {
+  if (isFirebaseConfigured() && database) {
+    try {
+      await database.ref('students/' + studentId).remove();
+    } catch (error) {
+      console.error('Failed to delete student from Firebase:', error);
+      showToast('削除に失敗しました', 'error');
+      throw error;
+    }
+  } else {
+    studentsCache = studentsCache.filter(s => s.id !== studentId);
+    localStorage.setItem(STUDENTS_KEY, JSON.stringify(studentsCache));
+  }
 }
 
 /**
  * IDで生徒を取得する
  */
 function getStudentById(id) {
-  const students = loadStudents();
-  return students.find(s => s.id === id) || null;
+  return studentsCache.find(s => s.id === id) || null;
 }
 
 /**
  * クラス・イニシャル・誕生日で生徒を検索
  */
 function findStudent(className, initials, birthday) {
-  const students = loadStudents();
-  return students.find(s => 
+  return studentsCache.find(s => 
     s.className === className && 
     s.initials.toUpperCase() === initials.toUpperCase() && 
     s.birthday === birthday
@@ -323,6 +460,13 @@ function handleRouting() {
       break;
     case 'teacher-login':
       document.getElementById('page-teacher-login').classList.remove('hidden');
+      break;
+    case 'teacher-settings':
+      if (!getTeacherSession()) {
+        navigateTo('teacher-login');
+        return;
+      }
+      document.getElementById('page-teacher-settings').classList.remove('hidden');
       break;
     case 'teacher-students':
       if (!getTeacherSession()) {
@@ -561,8 +705,8 @@ function renderStudentTicketList() {
   const container = document.getElementById('student-ticket-list');
   
   if (tickets.length === 0) {
-    const emptyMessage = studentTicketFilter === 'done' ? '完了した質問はありません' :
-                         studentTicketFilter === 'submitted' ? '受付中の質問はありません' :
+    const emptyMessage = studentTicketFilter === 'done' ? '解決済みの質問はありません' :
+                         studentTicketFilter === 'submitted' ? '未解決の質問はありません' :
                          'まだ質問がありません';
     container.innerHTML = `
       <div class="empty-list">
@@ -577,7 +721,7 @@ function renderStudentTicketList() {
     const purposeClass = ticket.purpose === 'grading' ? 'badge-grading' : 'badge-question';
     const purposeText = ticket.purpose === 'grading' ? '採点' : '質問';
     const statusClass = `badge-${ticket.status}`;
-    const statusText = { submitted: '受付済', done: '完了' }[ticket.status] || ticket.status;
+    const statusText = { submitted: '未解決', done: '解決済み' }[ticket.status] || ticket.status;
     const hasAnswer = ticket.status === 'done' && (ticket.teacherAnswer || ticket.teacherHint || (ticket.teacherImages && ticket.teacherImages.length > 0));
     const subjectClass = `subject-${ticket.subject}`;
     
@@ -621,7 +765,7 @@ function renderStudentDetail(id) {
   }
   
   const purposeText = ticket.purpose === 'grading' ? '採点をお願いする' : '質問する';
-  const statusText = { submitted: '受付済', done: '完了' }[ticket.status] || ticket.status;
+  const statusText = { submitted: '未解決', done: '解決済み' }[ticket.status] || ticket.status;
   const isDone = ticket.status === 'done';
   
   const content = document.getElementById('student-detail-content');
@@ -648,9 +792,9 @@ function renderStudentDetail(id) {
     </div>
     
     ${ticket.purpose === 'question' ? `
-    <!-- 質問理由 -->
+    <!-- 質問内容 -->
     <div class="detail-highlight">
-      <div class="detail-highlight-title">あなたの質問</div>
+      <div class="detail-highlight-title">質問内容</div>
       <div class="detail-checks">
         ${(ticket.checkedMaterials || []).map(m => `<span class="detail-check-item">${escapeHtml(m)}</span>`).join('')}
       </div>
@@ -746,7 +890,7 @@ function showStudentCompleteModal() {
 /**
  * 生徒が質問を完了する
  */
-function completeStudentTicket() {
+async function completeStudentTicket() {
   const ticket = getTicketById(currentStudentDetailTicketId);
   if (!ticket) return;
   
@@ -754,7 +898,7 @@ function completeStudentTicket() {
   ticket.doneAt = Date.now();
   ticket.completedByStudent = true;
   
-  upsertTicket(ticket);
+  await upsertTicket(ticket);
   showToast('質問を完了しました');
   navigateTo('student-mypage');
 }
@@ -993,7 +1137,7 @@ function validateForm() {
     
     const questionReason = document.getElementById('input-questionReason').value.trim();
     if (!questionReason) {
-      showToast('ひとこと理由を入力してください', 'error');
+      showToast('質問内容を入力してください', 'error');
       return false;
     }
   }
@@ -1065,7 +1209,7 @@ function showConfirmModal() {
       <div class="confirm-value">${data.checkedMaterials.map(m => escapeHtml(m)).join('、')}</div>
     </div>
     <div class="confirm-section">
-      <div class="confirm-label">ひとこと理由</div>
+      <div class="confirm-label">質問内容</div>
       <div class="confirm-value">${escapeHtml(data.questionReason)}</div>
     </div>
     ` : ''}
@@ -1100,11 +1244,11 @@ function closeConfirmModal() {
 /**
  * チケット送信
  */
-function submitTicket() {
+async function submitTicket() {
   const formData = collectFormData();
   formData.status = 'submitted';
   
-  upsertTicket(formData);
+  await upsertTicket(formData);
   
   closeConfirmModal();
   showToast('送信しました');
@@ -1239,7 +1383,7 @@ function closeStudentModal() {
 /**
  * 生徒を保存
  */
-function saveStudent() {
+async function saveStudent() {
   const id = document.getElementById('edit-student-id').value;
   const className = document.getElementById('edit-student-class').value;
   const initials = document.getElementById('edit-student-initials').value.trim().toUpperCase();
@@ -1280,7 +1424,7 @@ function saveStudent() {
     birthday
   };
   
-  upsertStudent(student);
+  await upsertStudent(student);
   closeStudentModal();
   showToast(id ? '更新しました' : '登録しました');
   renderStudentList();
@@ -1310,13 +1454,82 @@ function closeDeleteModal() {
 /**
  * 生徒削除を実行
  */
-function confirmDeleteStudent() {
+async function confirmDeleteStudent() {
   if (!deleteStudentId) return;
   
-  deleteStudent(deleteStudentId);
+  await deleteStudent(deleteStudentId);
   closeDeleteModal();
   showToast('削除しました');
   renderStudentList();
+}
+
+// ============================================
+// Data Deletion
+// ============================================
+
+/**
+ * データ削除モーダルを表示
+ */
+function showDeleteAllDataModal() {
+  document.getElementById('delete-all-modal').classList.remove('hidden');
+}
+
+/**
+ * データ削除モーダルを閉じる
+ */
+function closeDeleteAllDataModal() {
+  document.getElementById('delete-all-modal').classList.add('hidden');
+}
+
+/**
+ * 全ての質問データを削除
+ */
+async function deleteAllTickets() {
+  if (confirm('全ての質問データを削除しますか？')) {
+    if (isFirebaseConfigured() && database) {
+      await database.ref('tickets').remove();
+    }
+    localStorage.removeItem(STORAGE_KEY);
+    ticketsCache = [];
+    closeDeleteAllDataModal();
+    showToast('質問データを削除しました');
+    navigateTo('teacher');
+  }
+}
+
+/**
+ * 全ての生徒データを削除
+ */
+async function deleteAllStudents() {
+  if (confirm('全ての生徒データを削除しますか？')) {
+    if (isFirebaseConfigured() && database) {
+      await database.ref('students').remove();
+    }
+    localStorage.removeItem(STUDENTS_KEY);
+    studentsCache = [];
+    closeDeleteAllDataModal();
+    showToast('生徒データを削除しました');
+    navigateTo('teacher');
+  }
+}
+
+/**
+ * 全てのデータを削除
+ */
+async function deleteAllData() {
+  if (confirm('全てのデータを削除しますか？この操作は取り消せません。')) {
+    if (isFirebaseConfigured() && database) {
+      await database.ref('tickets').remove();
+      await database.ref('students').remove();
+    }
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(STUDENTS_KEY);
+    ticketsCache = [];
+    studentsCache = [];
+    closeDeleteAllDataModal();
+    showToast('全てのデータを削除しました');
+    navigateTo('teacher');
+  }
 }
 
 // ============================================
@@ -1362,7 +1575,7 @@ function renderTeacherList() {
     const purposeClass = ticket.purpose === 'grading' ? 'badge-grading' : 'badge-question';
     const purposeText = ticket.purpose === 'grading' ? '採点' : '質問';
     const statusClass = `badge-${ticket.status}`;
-    const statusText = { submitted: '受付済', done: '完了' }[ticket.status] || ticket.status;
+    const statusText = { submitted: '未解決', done: '対応完了' }[ticket.status] || ticket.status;
     const imageCount = (ticket.questionImages?.length || 0) + (ticket.answerImages?.length || 0);
     const subjectClass = `subject-${ticket.subject}`;
     
@@ -1456,10 +1669,13 @@ function renderTeacherDetail(id) {
     ${ticket.purpose === 'question' ? `
     <!-- 生徒の確認事項 -->
     <div class="detail-highlight">
-      <div class="detail-highlight-title">生徒が事前に確認したこと</div>
+      <div class="detail-highlight-title">確認したこと</div>
       <div class="detail-checks">
         ${(ticket.checkedMaterials || []).map(m => `<span class="detail-check-item">${escapeHtml(m)}</span>`).join('')}
       </div>
+    </div>
+    <div class="detail-highlight">
+      <div class="detail-highlight-title">質問内容</div>
       <div class="detail-highlight-content">${escapeHtml(ticket.questionReason || '')}</div>
     </div>
     ` : ''}
@@ -1558,7 +1774,7 @@ function renderTeacherDetail(id) {
 /**
  * 先生入力を保存
  */
-function saveTeacherInput() {
+async function saveTeacherInput() {
   const ticket = getTicketById(currentDetailTicketId);
   if (!ticket) return;
   
@@ -1566,14 +1782,14 @@ function saveTeacherInput() {
   ticket.teacherHint = document.getElementById('input-teacherHint').value;
   ticket.teacherImages = [...teacherImages];
   
-  upsertTicket(ticket);
+  await upsertTicket(ticket);
   showToast('保存しました');
 }
 
 /**
  * チケットを完了（この質問への対応を完了）
  */
-function completeTicket() {
+async function completeTicket() {
   const ticket = getTicketById(currentDetailTicketId);
   if (!ticket) return;
   
@@ -1583,7 +1799,7 @@ function completeTicket() {
   ticket.status = 'done';
   ticket.doneAt = Date.now();
   
-  upsertTicket(ticket);
+  await upsertTicket(ticket);
   showToast('対応完了しました');
   navigateTo('teacher');
 }
@@ -1609,5 +1825,8 @@ function escapeHtml(str) {
 window.addEventListener('hashchange', handleRouting);
 
 document.addEventListener('DOMContentLoaded', () => {
-  handleRouting();
+  initializeFirebaseData();
+  waitForData(() => {
+    handleRouting();
+  });
 });
