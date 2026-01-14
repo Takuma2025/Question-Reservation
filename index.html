@@ -246,15 +246,15 @@
         <div class="form-card">
           <label class="form-label">問題を撮影（複数枚可）</label>
           <div class="image-upload-area">
-            <input type="file" id="input-questionImages" accept="image/*" capture="environment" multiple class="file-input">
+            <input type="file" id="input-questionImages" accept="image/*" multiple class="file-input">
             <label for="input-questionImages" class="file-label">
               <svg class="file-icon" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                 <rect x="3" y="3" width="18" height="18" rx="2"/>
                 <circle cx="8.5" cy="8.5" r="1.5"/>
                 <path d="M21 15l-5-5L5 21"/>
               </svg>
-              <span>タップして撮影/選択</span>
-              <span class="file-label-hint">複数枚を一度に選択できます</span>
+              <span>タップして写真を選択</span>
+              <span class="file-label-hint">カメラで撮影 または アルバムから選択</span>
             </label>
           </div>
           <div id="preview-questionImages" class="image-preview-container"></div>
@@ -265,15 +265,15 @@
         <div class="form-card">
           <label class="form-label">解答・解説を撮影（複数枚可）</label>
           <div class="image-upload-area">
-            <input type="file" id="input-answerImages" accept="image/*" capture="environment" multiple class="file-input">
+            <input type="file" id="input-answerImages" accept="image/*" multiple class="file-input">
             <label for="input-answerImages" class="file-label">
               <svg class="file-icon" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                 <rect x="3" y="3" width="18" height="18" rx="2"/>
                 <circle cx="8.5" cy="8.5" r="1.5"/>
                 <path d="M21 15l-5-5L5 21"/>
               </svg>
-              <span>タップして撮影/選択</span>
-              <span class="file-label-hint">複数枚を一度に選択できます</span>
+              <span>タップして写真を選択</span>
+              <span class="file-label-hint">カメラで撮影 または アルバムから選択</span>
             </label>
           </div>
           <div id="preview-answerImages" class="image-preview-container"></div>
@@ -345,54 +345,10 @@
     </main>
   </div>
 
-  <!-- 先生画面（メニュー） -->
-  <div id="page-teacher-menu" class="page hidden">
-    <header class="header">
-      <button class="header-back" onclick="teacherLogout()">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M19 12H5M12 19l-7-7 7-7"/>
-        </svg>
-      </button>
-      <h1 class="header-title">先生メニュー</h1>
-      <div class="header-spacer"></div>
-    </header>
-    
-    <main class="main-content">
-      <div class="menu-container">
-        <button class="menu-card" onclick="navigateTo('teacher')">
-          <div class="menu-card-icon">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-              <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/>
-              <rect x="9" y="3" width="6" height="4" rx="1"/>
-              <path d="M9 12h6M9 16h6"/>
-            </svg>
-          </div>
-          <div class="menu-card-text">
-            <div class="menu-card-title">質問一覧</div>
-            <div class="menu-card-desc">生徒からの質問を確認・回答</div>
-          </div>
-        </button>
-        <button class="menu-card" onclick="navigateTo('teacher-students')">
-          <div class="menu-card-icon">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-              <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
-              <circle cx="9" cy="7" r="4"/>
-              <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>
-            </svg>
-          </div>
-          <div class="menu-card-text">
-            <div class="menu-card-title">生徒管理</div>
-            <div class="menu-card-desc">生徒の登録・編集・削除</div>
-          </div>
-        </button>
-      </div>
-    </main>
-  </div>
-
   <!-- 先生画面（生徒管理） -->
   <div id="page-teacher-students" class="page hidden">
     <header class="header">
-      <button class="header-back" onclick="navigateTo('teacher-menu')">
+      <button class="header-back" onclick="navigateTo('teacher')">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M19 12H5M12 19l-7-7 7-7"/>
         </svg>
@@ -503,13 +459,18 @@
   <!-- 先生画面（一覧） -->
   <div id="page-teacher" class="page hidden">
     <header class="header">
-      <button class="header-back" onclick="navigateTo('teacher-menu')">
+      <button class="header-back" onclick="teacherLogout()">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M19 12H5M12 19l-7-7 7-7"/>
         </svg>
       </button>
       <h1 class="header-title">質問一覧</h1>
-      <div class="header-spacer"></div>
+      <button class="header-action" onclick="navigateTo('teacher-students')" title="生徒管理">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+        </svg>
+      </button>
     </header>
     
     <main class="main-content">

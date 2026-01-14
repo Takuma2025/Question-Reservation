@@ -324,13 +324,6 @@ function handleRouting() {
     case 'teacher-login':
       document.getElementById('page-teacher-login').classList.remove('hidden');
       break;
-    case 'teacher-menu':
-      if (!getTeacherSession()) {
-        navigateTo('teacher-login');
-        return;
-      }
-      document.getElementById('page-teacher-menu').classList.remove('hidden');
-      break;
     case 'teacher-students':
       if (!getTeacherSession()) {
         navigateTo('teacher-login');
@@ -1131,7 +1124,7 @@ function teacherLogin() {
   if (password === TEACHER_PASSWORD) {
     setTeacherSession(true);
     showToast('ログインしました');
-    navigateTo('teacher-menu');
+    navigateTo('teacher');
   } else {
     showToast('パスワードが違います', 'error');
   }
