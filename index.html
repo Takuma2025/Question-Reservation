@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<!--
+  質問受付予約Web - index.html
+  塾向けの質問受付予約システムのメインHTMLファイル。
+  生徒画面と先生画面を URL ハッシュで切り替えて表示する。
+  ローカルで index.html を開くだけで動作（サーバー不要）。
+-->
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>質問受付予約</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- トースト通知コンテナ -->
+  <div id="toast-container"></div>
+
+  <!-- トップ画面 -->
+  <div id="page-top" class="page">
+    <div class="top-container">
+      <div class="top-header">
+        <div class="top-logo">Q</div>
+        <h1 class="top-title">質問受付</h1>
+        <p class="top-subtitle">Question Reservation System</p>
+      </div>
+      <div class="top-buttons">
+        <div class="top-buttons-title">ログイン</div>
+        <div class="top-btn-group">
+          <button class="top-btn" onclick="navigateTo('student-login')">
+            <div class="top-btn-icon student">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/>
+                <circle cx="12" cy="7" r="4"/>
+              </svg>
+            </div>
+            <div class="top-btn-text">
+              <div class="top-btn-title">生徒</div>
+              <div class="top-btn-desc">質問・採点依頼の登録</div>
+            </div>
+            <div class="top-btn-arrow">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M9 18l6-6-6-6"/>
+              </svg>
+            </div>
+          </button>
+          <button class="top-btn" onclick="navigateTo('teacher-login')">
+            <div class="top-btn-icon teacher">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 14l9-5-9-5-9 5 9 5z"/>
+                <path d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"/>
+              </svg>
+            </div>
+            <div class="top-btn-text">
+              <div class="top-btn-title">先生</div>
+              <div class="top-btn-desc">質問の確認・回答</div>
+            </div>
+            <div class="top-btn-arrow">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M9 18l6-6-6-6"/>
+              </svg>
+            </div>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 生徒ログイン画面 -->
+  <div id="page-student-login" class="page hidden">
+    <header class="header">
+      <button class="header-back" onclick="navigateTo('')">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M19 12H5M12 19l-7-7 7-7"/>
+        </svg>
+      </button>
+      <h1 class="header-title">生徒ログイン</h1>
+      <div class="header-spacer"></div>
+    </header>
+    
+    <main class="main-content">
+      <div class="login-container">
+        <div class="form-card">
+          <label class="form-label required">クラス</label>
+          <select id="login-className" class="form-select" required>
+            <option value="">選択してください</option>
+            <option value="4S">4S</option>
+            <option value="5S">5S</option>
+            <option value="6S">6S</option>
+            <option value="1A">1A</option>
+            <option value="2A">2A</option>
+            <option value="3A">3A</option>
+            <option value="4H">4H</option>
+            <option value="5H">5H</option>
+            <option value="6H">6H</option>
+            <option value="その他">その他</option>
+          </select>
+        </div>
+        <div class="form-card">
+          <label class="form-label required">イニシャル</label>
+          <select id="login-initials" class="form-select" required>
+            <option value="">先にクラスを選択</option>
+          </select>
+        </div>
+        <div class="form-card">
+          <label class="form-label required">パスワード（誕生日）</label>
+          <input type="password" id="login-birthday" class="form-input" placeholder="例: 0415（4桁）" maxlength="4" required>
+          <p class="form-hint">4桁の数字（月日）</p>
+        </div>
+        <button class="btn btn-primary btn-large btn-block" onclick="studentLogin()">ログイン</button>
+      </div>
+    </main>
+  </div>
+
+  <!-- 生徒マイページ画面 -->
+  <div id="page-student-mypage" class="page hidden">
+    <header class="header">
+      <button class="header-back" onclick="studentLogout()">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M19 12H5M12 19l-7-7 7-7"/>
+        </svg>
+      </button>
+      <h1 class="header-title">マイページ</h1>
+      <div class="header-spacer"></div>
+    </header>
+    
+    <main class="main-content">
+      <div class="mypage-header">
+        <div class="mypage-user-info" id="mypage-user-info"></div>
+        <button class="btn btn-primary" onclick="navigateTo('student')">新しい質問を登録</button>
+      </div>
+      
+      <div class="mypage-section">
+        <h2 class="mypage-section-title">あなたの質問一覧</h2>
+        <div class="filter-tabs" id="student-filter-tabs">
+          <button class="filter-tab active" data-filter="all" onclick="filterStudentTickets('all')">すべて</button>
+          <button class="filter-tab" data-filter="submitted" onclick="filterStudentTickets('submitted')">受付済み</button>
+          <button class="filter-tab" data-filter="done" onclick="filterStudentTickets('done')">完了</button>
+        </div>
+        <div id="student-ticket-list" class="ticket-list">
+          <!-- 動的に生成 -->
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- 生徒質問詳細画面 -->
+  <div id="page-student-detail" class="page hidden">
+    <header class="header">
+      <button class="header-back" onclick="navigateTo('student-mypage')">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M19 12H5M12 19l-7-7 7-7"/>
+        </svg>
+      </button>
+      <h1 class="header-title">質問詳細</h1>
+      <div class="header-spacer"></div>
+    </header>
+    
+    <main class="main-content with-footer" id="student-detail-content">
+      <!-- 動的に生成 -->
+    </main>
+    
+    <footer class="footer-fixed" id="student-detail-footer">
+      <!-- 動的に生成 -->
+    </footer>
+  </div>
+
+  <!-- 生徒画面（質問登録） -->
+  <div id="page-student" class="page hidden">
+    <header class="header">
+      <button class="header-back" onclick="navigateTo('student-mypage')">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M19 12H5M12 19l-7-7 7-7"/>
+        </svg>
+      </button>
+      <h1 class="header-title">質問登録</h1>
+      <div class="header-spacer"></div>
+    </header>
+    
+    <main class="main-content with-footer">
+      <form id="student-form" class="form-container">
+        <!-- 生徒ID（非表示） -->
+        <input type="hidden" id="input-studentId">
+        <input type="hidden" id="input-className">
+        <input type="hidden" id="input-initials">
+
+        <!-- ログイン情報表示 -->
+        <div class="form-card logged-in-info" id="logged-in-info">
+          <!-- 動的に設定 -->
+        </div>
+
+        <!-- 教科 -->
+        <div class="form-card">
+          <label class="form-label required">教科</label>
+          <select id="input-subject" class="form-select" required>
+            <option value="">選択してください</option>
+            <option value="英語">英語</option>
+            <option value="算数/数学">算数/数学</option>
+            <option value="国語">国語</option>
+            <option value="理科">理科</option>
+            <option value="社会">社会</option>
+            <option value="その他">その他</option>
+          </select>
+        </div>
+
+        <!-- 目的 -->
+        <div class="form-card">
+          <label class="form-label required">目的</label>
+          <div class="toggle-group">
+            <button type="button" class="toggle-btn active" data-purpose="question">質問する</button>
+            <button type="button" class="toggle-btn" data-purpose="grading">採点をお願いする</button>
+          </div>
+          <input type="hidden" id="input-purpose" value="question">
+        </div>
+
+        <!-- 事前確認チェック（質問時のみ必須） -->
+        <div class="form-card" id="card-checkedMaterials">
+          <label class="form-label required" id="label-checkedMaterials">事前に考えたこと（1つ以上選択）</label>
+          <div class="checkbox-group">
+            <label class="checkbox-item">
+              <input type="checkbox" name="checkedMaterials" value="解説を読んだ">
+              <span class="checkbox-text">解説を読んだ</span>
+            </label>
+            <label class="checkbox-item">
+              <input type="checkbox" name="checkedMaterials" value="ノートを見直した">
+              <span class="checkbox-text">ノートを見直した</span>
+            </label>
+            <label class="checkbox-item">
+              <input type="checkbox" name="checkedMaterials" value="テキストを見て考えた">
+              <span class="checkbox-text">テキストを見て考えた</span>
+            </label>
+          </div>
+          <p class="form-error hidden" id="error-checkedMaterials">1つ以上選択してください</p>
+        </div>
+
+        <!-- ひとこと理由（質問時のみ必須） -->
+        <div class="form-card" id="card-questionReason">
+          <label class="form-label required" id="label-questionReason">ひとこと理由</label>
+          <textarea id="input-questionReason" class="form-textarea" rows="3" 
+            placeholder="なぜわからないのかを書いてください（例：途中式の意味がわからない／どこで間違えたか不明）"></textarea>
+          <p class="form-hint">20〜120文字目安</p>
+          <p class="form-warning hidden" id="warning-questionReason">もう少し詳しく書くと先生に伝わりやすくなります</p>
+        </div>
+
+        <!-- 問題画像 -->
+        <div class="form-card">
+          <label class="form-label">問題を撮影（複数枚可）</label>
+          <div class="image-upload-area">
+            <input type="file" id="input-questionImages" accept="image/*" capture="environment" multiple class="file-input">
+            <label for="input-questionImages" class="file-label">
+              <svg class="file-icon" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <rect x="3" y="3" width="18" height="18" rx="2"/>
+                <circle cx="8.5" cy="8.5" r="1.5"/>
+                <path d="M21 15l-5-5L5 21"/>
+              </svg>
+              <span>タップして撮影/選択</span>
+              <span class="file-label-hint">複数枚を一度に選択できます</span>
+            </label>
+          </div>
+          <div id="preview-questionImages" class="image-preview-container"></div>
+          <div id="count-questionImages" class="hidden"></div>
+        </div>
+
+        <!-- 解答画像 -->
+        <div class="form-card">
+          <label class="form-label">解答・解説を撮影（複数枚可）</label>
+          <div class="image-upload-area">
+            <input type="file" id="input-answerImages" accept="image/*" capture="environment" multiple class="file-input">
+            <label for="input-answerImages" class="file-label">
+              <svg class="file-icon" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <rect x="3" y="3" width="18" height="18" rx="2"/>
+                <circle cx="8.5" cy="8.5" r="1.5"/>
+                <path d="M21 15l-5-5L5 21"/>
+              </svg>
+              <span>タップして撮影/選択</span>
+              <span class="file-label-hint">複数枚を一度に選択できます</span>
+            </label>
+          </div>
+          <div id="preview-answerImages" class="image-preview-container"></div>
+          <div id="count-answerImages" class="hidden"></div>
+        </div>
+      </form>
+    </main>
+
+    <footer class="footer-fixed">
+      <button type="button" class="btn btn-primary btn-block" onclick="showConfirmModal()">送信する</button>
+    </footer>
+  </div>
+
+  <!-- 確認モーダル -->
+  <div id="confirm-modal" class="modal hidden">
+    <div class="modal-overlay" onclick="closeConfirmModal()"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title">内容確認</h2>
+        <button class="modal-close" onclick="closeConfirmModal()">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M18 6L6 18M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body" id="confirm-modal-body">
+        <!-- 動的に内容が入る -->
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeConfirmModal()">戻る</button>
+        <button class="btn btn-primary" onclick="submitTicket()">送信する</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 画像拡大モーダル -->
+  <div id="image-modal" class="modal hidden">
+    <div class="modal-overlay" onclick="closeImageModal()"></div>
+    <div class="image-modal-content">
+      <button class="image-modal-close" onclick="closeImageModal()">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M18 6L6 18M6 6l12 12"/>
+        </svg>
+      </button>
+      <img id="image-modal-img" src="" alt="拡大画像">
+    </div>
+  </div>
+
+  <!-- 先生ログイン画面 -->
+  <div id="page-teacher-login" class="page hidden">
+    <header class="header">
+      <button class="header-back" onclick="navigateTo('')">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M19 12H5M12 19l-7-7 7-7"/>
+        </svg>
+      </button>
+      <h1 class="header-title">先生ログイン</h1>
+      <div class="header-spacer"></div>
+    </header>
+    
+    <main class="main-content">
+      <div class="login-container">
+        <div class="form-card">
+          <label class="form-label required">パスワード</label>
+          <input type="password" id="teacher-password" class="form-input" placeholder="パスワードを入力">
+        </div>
+        <button class="btn btn-primary btn-large btn-block" onclick="teacherLogin()">ログイン</button>
+      </div>
+    </main>
+  </div>
+
+  <!-- 先生画面（メニュー） -->
+  <div id="page-teacher-menu" class="page hidden">
+    <header class="header">
+      <button class="header-back" onclick="teacherLogout()">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M19 12H5M12 19l-7-7 7-7"/>
+        </svg>
+      </button>
+      <h1 class="header-title">先生メニュー</h1>
+      <div class="header-spacer"></div>
+    </header>
+    
+    <main class="main-content">
+      <div class="menu-container">
+        <button class="menu-card" onclick="navigateTo('teacher')">
+          <div class="menu-card-icon">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/>
+              <rect x="9" y="3" width="6" height="4" rx="1"/>
+              <path d="M9 12h6M9 16h6"/>
+            </svg>
+          </div>
+          <div class="menu-card-text">
+            <div class="menu-card-title">質問一覧</div>
+            <div class="menu-card-desc">生徒からの質問を確認・回答</div>
+          </div>
+        </button>
+        <button class="menu-card" onclick="navigateTo('teacher-students')">
+          <div class="menu-card-icon">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
+              <circle cx="9" cy="7" r="4"/>
+              <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>
+            </svg>
+          </div>
+          <div class="menu-card-text">
+            <div class="menu-card-title">生徒管理</div>
+            <div class="menu-card-desc">生徒の登録・編集・削除</div>
+          </div>
+        </button>
+      </div>
+    </main>
+  </div>
+
+  <!-- 先生画面（生徒管理） -->
+  <div id="page-teacher-students" class="page hidden">
+    <header class="header">
+      <button class="header-back" onclick="navigateTo('teacher-menu')">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M19 12H5M12 19l-7-7 7-7"/>
+        </svg>
+      </button>
+      <h1 class="header-title">生徒管理</h1>
+      <button class="header-action" onclick="showAddStudentModal()">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 5v14M5 12h14"/>
+        </svg>
+      </button>
+    </header>
+    
+    <main class="main-content">
+      <!-- クラスフィルタ -->
+      <div class="filter-bar">
+        <select id="filter-student-class" class="filter-select" onchange="renderStudentList()">
+          <option value="">全クラス</option>
+          <option value="4S">4S</option>
+          <option value="5S">5S</option>
+          <option value="6S">6S</option>
+          <option value="1A">1A</option>
+          <option value="2A">2A</option>
+          <option value="3A">3A</option>
+          <option value="4H">4H</option>
+          <option value="5H">5H</option>
+          <option value="6H">6H</option>
+          <option value="その他">その他</option>
+        </select>
+      </div>
+
+      <!-- 生徒一覧 -->
+      <div id="student-manage-list" class="student-list">
+        <!-- 動的に生成 -->
+      </div>
+    </main>
+  </div>
+
+  <!-- 生徒追加/編集モーダル -->
+  <div id="student-modal" class="modal hidden">
+    <div class="modal-overlay" onclick="closeStudentModal()"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title" id="student-modal-title">生徒を追加</h2>
+        <button class="modal-close" onclick="closeStudentModal()">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M18 6L6 18M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="edit-student-id">
+        <div class="form-card">
+          <label class="form-label required">クラス</label>
+          <select id="edit-student-class" class="form-select" required>
+            <option value="">選択してください</option>
+            <option value="4S">4S</option>
+            <option value="5S">5S</option>
+            <option value="6S">6S</option>
+            <option value="1A">1A</option>
+            <option value="2A">2A</option>
+            <option value="3A">3A</option>
+            <option value="4H">4H</option>
+            <option value="5H">5H</option>
+            <option value="6H">6H</option>
+            <option value="その他">その他</option>
+          </select>
+        </div>
+        <div class="form-card">
+          <label class="form-label required">イニシャル</label>
+          <input type="text" id="edit-student-initials" class="form-input" placeholder="例: YT" maxlength="10" required>
+          <p class="form-hint">アルファベットで入力</p>
+        </div>
+        <div class="form-card">
+          <label class="form-label required">誕生日（パスワード）</label>
+          <input type="text" id="edit-student-birthday" class="form-input" placeholder="例: 0415（4桁）" maxlength="4" required>
+          <p class="form-hint">4桁の数字（月日）</p>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeStudentModal()">キャンセル</button>
+        <button class="btn btn-primary" onclick="saveStudent()">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 削除確認モーダル -->
+  <div id="delete-modal" class="modal hidden">
+    <div class="modal-overlay" onclick="closeDeleteModal()"></div>
+    <div class="modal-content modal-small">
+      <div class="modal-header">
+        <h2 class="modal-title">削除確認</h2>
+        <button class="modal-close" onclick="closeDeleteModal()">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M18 6L6 18M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <p id="delete-modal-message">この生徒を削除しますか？</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeDeleteModal()">キャンセル</button>
+        <button class="btn btn-danger" onclick="confirmDeleteStudent()">削除</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 先生画面（一覧） -->
+  <div id="page-teacher" class="page hidden">
+    <header class="header">
+      <button class="header-back" onclick="navigateTo('teacher-menu')">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M19 12H5M12 19l-7-7 7-7"/>
+        </svg>
+      </button>
+      <h1 class="header-title">質問一覧</h1>
+      <div class="header-spacer"></div>
+    </header>
+    
+    <main class="main-content">
+      <!-- フィルタ -->
+      <div class="filter-bar">
+        <select id="filter-class" class="filter-select" onchange="renderTeacherList()">
+          <option value="">全クラス</option>
+          <option value="4S">4S</option>
+          <option value="5S">5S</option>
+          <option value="6S">6S</option>
+          <option value="1A">1A</option>
+          <option value="2A">2A</option>
+          <option value="3A">3A</option>
+          <option value="4H">4H</option>
+          <option value="5H">5H</option>
+          <option value="6H">6H</option>
+          <option value="その他">その他</option>
+        </select>
+        <select id="filter-subject" class="filter-select" onchange="renderTeacherList()">
+          <option value="">全教科</option>
+          <option value="英語">英語</option>
+          <option value="算数/数学">算数/数学</option>
+          <option value="国語">国語</option>
+          <option value="理科">理科</option>
+          <option value="社会">社会</option>
+          <option value="その他">その他</option>
+        </select>
+        <select id="filter-status" class="filter-select" onchange="renderTeacherList()">
+          <option value="">全ステータス</option>
+          <option value="submitted" selected>受付済み</option>
+          <option value="done">完了</option>
+        </select>
+      </div>
+
+      <!-- カード一覧 -->
+      <div id="teacher-list" class="ticket-list">
+        <!-- 動的に生成 -->
+      </div>
+    </main>
+  </div>
+
+  <!-- 先生詳細画面 -->
+  <div id="page-teacher-detail" class="page hidden">
+    <header class="header">
+      <button class="header-back" onclick="navigateTo('teacher')">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M19 12H5M12 19l-7-7 7-7"/>
+        </svg>
+      </button>
+      <h1 class="header-title">詳細</h1>
+      <div class="header-spacer"></div>
+    </header>
+    
+    <main class="main-content with-footer" id="teacher-detail-content">
+      <!-- 動的に生成 -->
+    </main>
+
+    <footer class="footer-fixed" id="teacher-detail-footer">
+      <!-- 動的に生成 -->
+    </footer>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
