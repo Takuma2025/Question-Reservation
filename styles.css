@@ -819,18 +819,20 @@ body {
    ============================================ */
 .filter-bar {
   display: flex;
-  gap: 10px;
+  gap: 8px;
   margin-bottom: 20px;
+  flex-wrap: wrap;
 }
 
 .filter-select {
-  flex: 1;
-  padding: 14px 16px;
+  flex: 1 1 calc(50% - 4px);
+  min-width: 0;
+  padding: 14px 12px;
   border: 2px solid var(--color-border);
   border-radius: var(--radius-md);
-  font-size: 15px;
+  font-size: 16px;
   background: var(--color-white);
-  font-weight: 500;
+  font-weight: 600;
   min-height: 52px;
   cursor: pointer;
 }
@@ -1659,12 +1661,12 @@ body {
     height: 240px;
   }
   
-  .filter-bar {
-    flex-wrap: wrap;
-  }
-  
   .filter-select {
-    flex: 1 1 45%;
+    flex: 1 1 auto;
+    min-width: 120px;
+    padding: 12px 14px;
+    font-size: 15px;
+    min-height: 48px;
   }
 }
 
