@@ -21,7 +21,7 @@
   --color-warning: #f39800;
   --color-danger: #e60012;
   --color-danger-light: #ffeaec;
-  --color-bg: #f5f8fa;
+  --color-bg: #e8f4fc;
   --color-white: #ffffff;
   --color-text: #333333;
   --color-text-secondary: #666666;
@@ -316,13 +316,29 @@ body {
   background: var(--color-primary-light);
 }
 
+.btn-memo-save {
+  margin-top: 10px;
+  padding: 10px 20px;
+  background: #6b7280;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-memo-save:hover {
+  background: #4b5563;
+}
+
 .btn-accent {
-  background: var(--color-primary);
+  background: #f97316;
   color: var(--color-white);
 }
 
 .btn-accent:hover {
-  background: #e08a00;
+  background: #ea580c;
 }
 
 .btn-large {
@@ -438,6 +454,22 @@ body {
   background: var(--color-white);
   color: var(--color-primary);
   box-shadow: inset 0 0 0 1px var(--color-primary);
+}
+
+/* 質問ボタン - 青 */
+.toggle-btn[data-purpose="question"].active {
+  border-color: #3b82f6;
+  background: #dbeafe;
+  color: #1d4ed8;
+  box-shadow: none;
+}
+
+/* 採点ボタン - ピンク */
+.toggle-btn[data-purpose="grading"].active {
+  border-color: #ec4899;
+  background: #fce7f3;
+  color: #be185d;
+  box-shadow: none;
 }
 
 /* Checkbox Group */
@@ -832,29 +864,32 @@ body {
 .ticket-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
 }
 
 .ticket-card {
   background: var(--color-white);
-  border-radius: var(--radius-lg);
-  padding: 18px 20px;
+  border-radius: 12px;
+  padding: 16px;
   cursor: pointer;
   transition: all 0.2s;
-  box-shadow: var(--shadow-sm);
-  border-left: 4px solid var(--color-primary);
+  border: 1px solid #e5e7eb;
 }
 
 .ticket-card:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-md);
+  background: #f9fafb;
 }
 
 .ticket-card-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin-bottom: 10px;
+  gap: 8px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.ticket-card-header .ticket-badge {
+  margin-left: auto;
 }
 
 .ticket-subject {
@@ -865,117 +900,127 @@ body {
 
 .ticket-badge {
   display: inline-block;
-  padding: 4px 12px;
-  border-radius: var(--radius-full);
+  padding: 3px 8px;
+  border-radius: 2px;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .badge-submitted {
-  background: var(--color-secondary-light);
-  color: var(--color-primary);
+  background: #ef4444;
+  color: #fff;
+  font-weight: 700;
 }
 
 .badge-done {
-  background: var(--color-success-light);
-  color: var(--color-success);
+  background: #e5e7eb;
+  color: #6b7280;
+}
+
+/* Purpose badges */
+.purpose-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 2px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.purpose-badge svg {
+  flex-shrink: 0;
 }
 
 .badge-question {
-  background: var(--color-secondary-light);
-  color: var(--color-secondary);
+  background: #dbeafe;
+  color: #1d4ed8;
 }
 
 .badge-grading {
-  background: var(--color-accent-light);
-  color: var(--color-accent);
+  background: #fce7f3;
+  color: #be185d;
 }
 
 /* Subject Colors */
 .subject-badge {
   display: inline-block;
-  padding: 4px 12px;
-  border-radius: var(--radius-full);
+  padding: 3px 10px;
+  border-radius: 2px;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 /* 英語: ピンク */
 .subject-英語 {
-  background: #fce7f3;
-  color: #be185d;
+  background: #ec4899;
+  color: #fff;
 }
 
 /* 算数/数学: 青 */
 .subject-算数\/数学 {
-  background: #dbeafe;
-  color: #1d4ed8;
+  background: #3b82f6;
+  color: #fff;
 }
 
 /* 国語: オレンジ */
 .subject-国語 {
-  background: #ffedd5;
-  color: #c2410c;
+  background: #f97316;
+  color: #fff;
 }
 
 /* 理科: 緑 */
 .subject-理科 {
-  background: #d1fae5;
-  color: #047857;
+  background: #22c55e;
+  color: #fff;
 }
 
 /* 社会: 黄色 */
 .subject-社会 {
-  background: #fef9c3;
-  color: #a16207;
+  background: #eab308;
+  color: #fff;
 }
 
 /* その他: グレー */
 .subject-その他 {
-  background: #f1f5f9;
-  color: #475569;
+  background: #94a3b8;
+  color: #fff;
 }
 
-/* Card border colors by subject */
-.ticket-card.border-英語 {
-  border-left-color: #ec4899;
+.ticket-student {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
 }
 
-.ticket-card.border-算数\/数学 {
-  border-left-color: #3b82f6;
+.student-class {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1f2937;
+  background: #f3f4f6;
+  padding: 2px 8px;
+  border-radius: 4px;
 }
 
-.ticket-card.border-国語 {
-  border-left-color: #f97316;
-}
-
-.ticket-card.border-理科 {
-  border-left-color: #10b981;
-}
-
-.ticket-card.border-社会 {
-  border-left-color: #eab308;
-}
-
-.ticket-card.border-その他 {
-  border-left-color: #94a3b8;
+.student-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: #111827;
 }
 
 .ticket-meta {
   display: flex;
   align-items: center;
-  gap: 12px;
-  font-size: 13px;
-  color: var(--color-text-secondary);
-  margin-bottom: 10px;
+  gap: 8px;
+  font-size: 12px;
+  color: #6b7280;
+  margin-bottom: 6px;
   flex-wrap: wrap;
 }
 
 .ticket-checks {
-  display: flex;
-  gap: 6px;
-  margin-bottom: 10px;
-  flex-wrap: wrap;
+  display: none;
 }
 
 .check-tag {
@@ -988,12 +1033,52 @@ body {
 }
 
 .ticket-reason {
-  font-size: 14px;
-  color: var(--color-text);
+  font-size: 13px;
+  color: #374151;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  line-height: 1.5;
+  line-height: 1.4;
+  margin-top: 4px;
+}
+
+.ticket-card-with-image {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ticket-card-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.ticket-card-thumbnail {
+  width: 100%;
+  height: 200px;
+  border-radius: 10px;
+  overflow: hidden;
+  position: relative;
+  background: #f3f4f6;
+}
+
+.ticket-card-thumbnail img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #f9fafb;
+}
+
+.thumbnail-more {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 6px;
 }
 
 .empty-list {
@@ -1143,7 +1228,7 @@ body {
 }
 
 .detail-wrapper .form-textarea {
-  background: var(--color-bg);
+  background: var(--color-white);
   border: 1px solid var(--color-border);
 }
 
@@ -1538,16 +1623,22 @@ body {
 }
 
 /* ============================================
-   Responsive
+   Responsive - Smartphone (default)
    ============================================ */
-@media (min-width: 600px) {
+/* Base styles are for smartphone */
+
+/* ============================================
+   Responsive - Tablet (481px - 1024px)
+   ============================================ */
+@media (min-width: 481px) {
   .main-content {
-    max-width: 560px;
+    max-width: 600px;
     margin: 0 auto;
+    padding: 16px 24px;
   }
   
   .footer-fixed {
-    max-width: 560px;
+    max-width: 600px;
     left: 50%;
     transform: translateX(-50%);
     border-radius: var(--radius-xl) var(--radius-xl) 0 0;
@@ -1562,6 +1653,75 @@ body {
   .modal {
     align-items: center;
     padding: 24px;
+  }
+  
+  .ticket-card-thumbnail {
+    height: 240px;
+  }
+  
+  .filter-bar {
+    flex-wrap: wrap;
+  }
+  
+  .filter-select {
+    flex: 1 1 45%;
+  }
+}
+
+/* ============================================
+   Responsive - PC (1025px+)
+   ============================================ */
+@media (min-width: 1025px) {
+  .main-content {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 24px 32px;
+  }
+  
+  .footer-fixed {
+    max-width: 900px;
+  }
+  
+  .ticket-list {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+  }
+  
+  .ticket-card {
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 16px;
+  }
+  
+  .ticket-card-thumbnail {
+    height: 200px;
+  }
+  
+  .filter-bar {
+    flex-wrap: nowrap;
+  }
+  
+  .filter-select {
+    flex: 1;
+  }
+  
+  .form-group {
+    display: grid;
+    grid-template-columns: 120px 1fr;
+    align-items: start;
+    gap: 16px;
+  }
+  
+  .form-label {
+    padding-top: 14px;
+    margin-bottom: 0;
+  }
+  
+  .detail-row {
+    display: grid;
+    grid-template-columns: 120px 1fr;
+    gap: 16px;
   }
 }
 

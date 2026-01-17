@@ -818,24 +818,38 @@ function renderStudentTicketList() {
   
   container.innerHTML = tickets.map(ticket => {
     const purposeClass = ticket.purpose === 'grading' ? 'badge-grading' : 'badge-question';
+    const purposeIcon = ticket.purpose === 'grading' 
+      ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>'
+      : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><circle cx="12" cy="17" r="0.5" fill="currentColor"/></svg>';
     const purposeText = ticket.purpose === 'grading' ? '採点' : '質問';
     const statusClass = `badge-${ticket.status}`;
     const statusText = { submitted: '未解決', done: '解決済み' }[ticket.status] || ticket.status;
     const hasAnswer = ticket.status === 'done';
     const subjectClass = `subject-${ticket.subject}`;
+    const questionImages = ticket.questionImages || [];
+    const hasImages = questionImages.length > 0;
     
     return `
-      <div class="ticket-card border-${ticket.subject}" onclick="navigateTo('student-detail', { id: '${ticket.id}' })">
-        <div class="ticket-card-header">
-          <span class="subject-badge ${subjectClass}">${escapeHtml(ticket.subject)}</span>
-          <span class="ticket-badge ${statusClass}">${statusText}</span>
+      <div class="ticket-card" onclick="navigateTo('student-detail', { id: '${ticket.id}' })">
+        <div class="${hasImages ? 'ticket-card-with-image' : ''}">
+          <div class="ticket-card-content">
+            <div class="ticket-card-header">
+              <span class="subject-badge ${subjectClass}">${escapeHtml(ticket.subject)}</span>
+              <span class="purpose-badge ${purposeClass}">${purposeIcon}${purposeText}</span>
+              <span class="ticket-badge ${statusClass}">${statusText}</span>
+            </div>
+            <div class="ticket-meta">
+              <span>${formatDateTime(ticket.createdAt)}</span>
+            </div>
+            <div class="ticket-reason">${escapeHtml(ticket.questionReason || (ticket.purpose === 'grading' ? '採点依頼' : ''))}</div>
+          </div>
+          ${hasImages ? `
+          <div class="ticket-card-thumbnail">
+            <img src="${questionImages[0]}" alt="問題画像">
+            ${questionImages.length > 1 ? `<div class="thumbnail-more">+${questionImages.length - 1}</div>` : ''}
+          </div>
+          ` : ''}
         </div>
-        <div class="ticket-meta">
-          <span class="ticket-badge ${purposeClass}">${purposeText}</span>
-          <span>${formatDateTime(ticket.createdAt)}</span>
-          ${hasAnswer ? '<span class="ticket-badge badge-done">回答あり</span>' : ''}
-        </div>
-        <div class="ticket-reason">${escapeHtml(ticket.questionReason || (ticket.purpose === 'grading' ? '採点依頼' : ''))}</div>
       </div>
     `;
   }).join('');
@@ -864,8 +878,13 @@ function renderStudentDetail(id) {
   }
   
   const purposeText = ticket.purpose === 'grading' ? '採点をお願いする' : '質問する';
+  const purposeClass = ticket.purpose === 'grading' ? 'badge-grading' : 'badge-question';
+  const purposeIcon = ticket.purpose === 'grading' 
+    ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>'
+    : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><circle cx="12" cy="17" r="0.5" fill="currentColor"/></svg>';
   const statusText = { submitted: '未解決', done: '解決済み' }[ticket.status] || ticket.status;
   const isDone = ticket.status === 'done';
+  const subjectClass = `subject-${ticket.subject}`;
   
   const content = document.getElementById('student-detail-content');
   content.innerHTML = `
@@ -874,11 +893,11 @@ function renderStudentDetail(id) {
       <div class="detail-section-title">質問内容</div>
       <div class="detail-row">
         <span class="detail-label">教科</span>
-        <span class="detail-value">${escapeHtml(ticket.subject)}</span>
+        <span class="subject-badge ${subjectClass}">${escapeHtml(ticket.subject)}</span>
       </div>
       <div class="detail-row">
         <span class="detail-label">目的</span>
-        <span class="detail-value">${purposeText}</span>
+        <span class="purpose-badge ${purposeClass}">${purposeIcon}${purposeText}</span>
       </div>
       <div class="detail-row">
         <span class="detail-label">ステータス</span>
@@ -909,6 +928,20 @@ function renderStudentDetail(id) {
           ${ticket.questionImages.map(src => `
             <div class="detail-gallery-item">
               <img src="${src}" alt="問題画像" data-full="${src}" onclick="openDetailImageModal(this.dataset.full)">
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    ` : ''}
+    
+    <!-- 自分の答案画像 -->
+    ${(ticket.myAnswerImages || []).length > 0 ? `
+      <div class="detail-section">
+        <div class="detail-section-title">自分の答案（${ticket.myAnswerImages.length}枚）</div>
+        <div class="detail-gallery">
+          ${ticket.myAnswerImages.map(src => `
+            <div class="detail-gallery-item">
+              <img src="${src}" alt="自分の答案" data-full="${src}" onclick="openDetailImageModal(this.dataset.full)">
             </div>
           `).join('')}
         </div>
@@ -985,6 +1018,7 @@ async function completeStudentTicket() {
 
 let questionImages = [];
 let answerImages = [];
+let myAnswerImages = [];
 let currentEditingTicketId = null;
 
 /**
@@ -997,10 +1031,12 @@ function initStudentPage() {
   document.getElementById('student-form').reset();
   questionImages = [];
   answerImages = [];
+  myAnswerImages = [];
   currentEditingTicketId = null;
   
   document.getElementById('preview-questionImages').innerHTML = '';
   document.getElementById('preview-answerImages').innerHTML = '';
+  document.getElementById('preview-myAnswerImages').innerHTML = '';
   updateImageCount('question');
   updateImageCount('answer');
   
@@ -1029,6 +1065,7 @@ function updateFormByPurpose(purpose) {
   const reasonCard = document.getElementById('card-questionReason');
   const checkLabel = document.getElementById('label-checkedMaterials');
   const reasonLabel = document.getElementById('label-questionReason');
+  const myAnswerSection = document.getElementById('myAnswerImages-section');
   
   if (purpose === 'grading') {
     // 採点の場合は任意
@@ -1036,12 +1073,14 @@ function updateFormByPurpose(purpose) {
     reasonLabel.classList.remove('required');
     checkCard.style.display = 'none';
     reasonCard.style.display = 'none';
+    if (myAnswerSection) myAnswerSection.classList.remove('hidden');
   } else {
     // 質問の場合は必須
     checkLabel.classList.add('required');
     reasonLabel.classList.add('required');
     checkCard.style.display = 'block';
     reasonCard.style.display = 'block';
+    if (myAnswerSection) myAnswerSection.classList.add('hidden');
   }
 }
 
@@ -1068,6 +1107,11 @@ function setupStudentEventListeners() {
     this.value = '';
   };
   
+  document.getElementById('input-myAnswerImages').onchange = function(e) {
+    handleImageUpload(e.target.files, 'myAnswer');
+    this.value = '';
+  };
+  
   document.getElementById('input-questionReason').oninput = function() {
     const warning = document.getElementById('warning-questionReason');
     if (this.value.length > 0 && this.value.length < 20) {
@@ -1082,7 +1126,7 @@ function setupStudentEventListeners() {
  * 画像アップロード処理（複数対応）
  */
 function handleImageUpload(files, type) {
-  const imageArray = type === 'question' ? questionImages : answerImages;
+  const imageArray = type === 'question' ? questionImages : (type === 'answer' ? answerImages : myAnswerImages);
   
   Array.from(files).forEach(file => {
     const reader = new FileReader();
@@ -1100,7 +1144,7 @@ function handleImageUpload(files, type) {
  * 画像枚数表示を更新
  */
 function updateImageCount(type) {
-  const images = type === 'question' ? questionImages : answerImages;
+  const images = type === 'question' ? questionImages : (type === 'answer' ? answerImages : myAnswerImages);
   const countEl = document.getElementById(`count-${type}Images`);
   
   if (!countEl) return;
@@ -1120,7 +1164,7 @@ function renderImagePreviews(type) {
   const container = document.getElementById(`preview-${type}Images`);
   if (!container) return;
   
-  const images = type === 'question' ? questionImages : answerImages;
+  const images = type === 'question' ? questionImages : (type === 'answer' ? answerImages : myAnswerImages);
   
   container.innerHTML = images.map((src, index) => `
     <div class="image-preview-item">
@@ -1243,6 +1287,7 @@ function collectFormData() {
     questionReason: document.getElementById('input-questionReason').value.trim(),
     questionImages: [...questionImages],
     answerImages: [...answerImages],
+    myAnswerImages: [...myAnswerImages],
     teacherMemo: '',
     doneAt: null
   };
@@ -1286,6 +1331,14 @@ function showConfirmModal() {
         <div class="confirm-label">問題画像（${data.questionImages.length}枚）</div>
         <div class="confirm-images">
           ${data.questionImages.map(src => `<img src="${src}" alt="問題画像">`).join('')}
+        </div>
+      </div>
+    ` : ''}
+    ${data.myAnswerImages.length > 0 ? `
+      <div class="confirm-section">
+        <div class="confirm-label">自分の答案（${data.myAnswerImages.length}枚）</div>
+        <div class="confirm-images">
+          ${data.myAnswerImages.map(src => `<img src="${src}" alt="自分の答案">`).join('')}
         </div>
       </div>
     ` : ''}
@@ -1701,33 +1754,41 @@ function renderTeacherList() {
   
   container.innerHTML = filtered.map(ticket => {
     const purposeClass = ticket.purpose === 'grading' ? 'badge-grading' : 'badge-question';
+    const purposeIcon = ticket.purpose === 'grading' 
+      ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>'
+      : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><circle cx="12" cy="17" r="0.5" fill="currentColor"/></svg>';
     const purposeText = ticket.purpose === 'grading' ? '採点' : '質問';
     const statusClass = `badge-${ticket.status}`;
-    const statusText = { submitted: '未解決', done: '対応完了' }[ticket.status] || ticket.status;
-    const imageCount = (ticket.questionImages?.length || 0) + (ticket.answerImages?.length || 0);
+    const statusText = { submitted: '対応待ち', done: '対応完了' }[ticket.status] || ticket.status;
+    const questionImages = ticket.questionImages || [];
     const subjectClass = `subject-${ticket.subject}`;
+    const hasImages = questionImages.length > 0;
     
     return `
-      <div class="ticket-card border-${ticket.subject}" onclick="navigateTo('teacher-detail', { id: '${ticket.id}' })">
-        <div class="ticket-card-header">
-          <span class="subject-badge ${subjectClass}">${escapeHtml(ticket.subject)}</span>
-          <span class="ticket-badge ${statusClass}">${statusText}</span>
+      <div class="ticket-card" onclick="navigateTo('teacher-detail', { id: '${ticket.id}' })">
+        <div class="${hasImages ? 'ticket-card-with-image' : ''}">
+          <div class="ticket-card-content">
+            <div class="ticket-card-header">
+              <span class="subject-badge ${subjectClass}">${escapeHtml(ticket.subject)}</span>
+              <span class="purpose-badge ${purposeClass}">${purposeIcon}${purposeText}</span>
+              <span class="ticket-badge ${statusClass}">${statusText}</span>
+            </div>
+            <div class="ticket-student">
+              <span class="student-class">${escapeHtml(ticket.className)}</span>
+              <span class="student-name">${escapeHtml(ticket.initials)}</span>
+            </div>
+            <div class="ticket-meta">
+              <span>${formatDateTime(ticket.createdAt)}</span>
+            </div>
+            <div class="ticket-reason">${escapeHtml(ticket.questionReason || (ticket.purpose === 'grading' ? '採点依頼' : ''))}</div>
+          </div>
+          ${hasImages ? `
+          <div class="ticket-card-thumbnail">
+            <img src="${questionImages[0]}" alt="問題画像">
+            ${questionImages.length > 1 ? `<div class="thumbnail-more">+${questionImages.length - 1}</div>` : ''}
+          </div>
+          ` : ''}
         </div>
-        <div class="ticket-meta">
-          <span class="ticket-badge badge-submitted">${escapeHtml(ticket.className)}</span>
-          <span>${escapeHtml(ticket.initials)}</span>
-          <span class="ticket-badge ${purposeClass}">${purposeText}</span>
-          ${imageCount > 0 ? `<span>画像${imageCount}枚</span>` : ''}
-        </div>
-        <div class="ticket-meta">
-          <span>${formatDateTime(ticket.createdAt)}</span>
-        </div>
-        ${ticket.purpose === 'question' ? `
-        <div class="ticket-checks">
-          ${(ticket.checkedMaterials || []).map(m => `<span class="check-tag">${escapeHtml(m)}</span>`).join('')}
-        </div>
-        ` : ''}
-        <div class="ticket-reason">${escapeHtml(ticket.questionReason || (ticket.purpose === 'grading' ? '採点依頼' : ''))}</div>
       </div>
     `;
   }).join('');
@@ -1755,7 +1816,11 @@ function renderTeacherDetail(id) {
   const isDone = ticket.status === 'done';
   const purposeText = ticket.purpose === 'grading' ? '採点をお願いする' : '質問する';
   const purposeClass = ticket.purpose === 'grading' ? 'badge-grading' : 'badge-question';
+  const purposeIcon = ticket.purpose === 'grading' 
+    ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>'
+    : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><circle cx="12" cy="17" r="0.5" fill="currentColor"/></svg>';
   const studentDisplay = ticket.initials;
+  const subjectClass = `subject-${ticket.subject}`;
   
   const content = document.getElementById('teacher-detail-content');
   content.innerHTML = `
@@ -1771,11 +1836,11 @@ function renderTeacherDetail(id) {
       </div>
       <div class="detail-row">
         <span class="detail-label">教科</span>
-        <span class="detail-value">${escapeHtml(ticket.subject)}</span>
+        <span class="subject-badge ${subjectClass}">${escapeHtml(ticket.subject)}</span>
       </div>
       <div class="detail-row">
         <span class="detail-label">目的</span>
-        <span class="ticket-badge ${purposeClass}">${purposeText}</span>
+        <span class="purpose-badge ${purposeClass}">${purposeIcon}${purposeText}</span>
       </div>
       <div class="detail-row">
         <span class="detail-label">受付日時</span>
@@ -1814,6 +1879,19 @@ function renderTeacherDetail(id) {
         </div>
       ` : ''}
       
+      <!-- 自分の答案画像 -->
+      ${(ticket.myAnswerImages || []).length > 0 ? `
+        <div class="detail-divider"></div>
+        <div class="detail-section-title">自分の答案（${ticket.myAnswerImages.length}枚）</div>
+        <div class="detail-gallery">
+          ${ticket.myAnswerImages.map(src => `
+            <div class="detail-gallery-item">
+              <img src="${src}" alt="自分の答案" data-full="${src}" onclick="openDetailImageModal(this.dataset.full)">
+            </div>
+          `).join('')}
+        </div>
+      ` : ''}
+      
       <!-- 解答画像 -->
       ${(ticket.answerImages || []).length > 0 ? `
         <div class="detail-divider"></div>
@@ -1832,6 +1910,9 @@ function renderTeacherDetail(id) {
       <div class="detail-section-title">メモ</div>
       <textarea id="input-teacherMemo" class="form-textarea" rows="3" 
         placeholder="メモを入力" ${isDone ? 'readonly' : ''}>${escapeHtml(ticket.teacherMemo || '')}</textarea>
+      ${!isDone ? `
+      <button class="btn btn-memo-save" onclick="saveTeacherMemoWithToast()">メモを保存</button>
+      ` : ''}
     </div>
   `;
   
@@ -1856,6 +1937,7 @@ function renderTeacherDetail(id) {
     `;
   } else {
     footer.innerHTML = `
+      <button class="btn btn-outline" onclick="navigateTo('teacher')">戻る</button>
       <button class="btn btn-primary" onclick="completeTicket()">対応完了</button>
     `;
   }
@@ -1873,6 +1955,14 @@ async function saveTeacherMemo() {
     ticket.teacherMemo = memoInput.value;
     await upsertTicket(ticket);
   }
+}
+
+/**
+ * メモを保存（ボタン用・トースト付き）
+ */
+async function saveTeacherMemoWithToast() {
+  await saveTeacherMemo();
+  showToast('メモを保存しました');
 }
 
 /**

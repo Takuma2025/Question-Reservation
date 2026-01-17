@@ -255,12 +255,7 @@
         <div class="form-card" id="card-questionReason">
           <label class="form-label required" id="label-questionReason">質問内容</label>
           <textarea id="input-questionReason" class="form-textarea" rows="4" 
-            placeholder="どこがわからないか具体的に書いてください。
-例：
-・(1)の解き方がわからない。
-・なぜ～になるのかわからない。
-・〇〇について教えてほしい。
-""></textarea>
+            placeholder=""></textarea>
           <p class="form-hint">具体的に書くと先生が答えやすくなります</p>
           <p class="form-warning hidden" id="warning-questionReason">もう少し詳しく書くと先生に伝わりやすくなります</p>
         </div>
@@ -282,6 +277,25 @@
           </div>
           <div id="preview-questionImages" class="image-preview-container"></div>
           <div id="count-questionImages" class="hidden"></div>
+        </div>
+
+        <!-- 自分の答案画像（採点時のみ） -->
+        <div class="form-card hidden" id="myAnswerImages-section">
+          <label class="form-label">自分の答案を撮影（複数枚可）</label>
+          <div class="image-upload-area">
+            <input type="file" id="input-myAnswerImages" accept="image/*" multiple class="file-input">
+            <label for="input-myAnswerImages" class="file-label">
+              <svg class="file-icon" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <rect x="3" y="3" width="18" height="18" rx="2"/>
+                <circle cx="8.5" cy="8.5" r="1.5"/>
+                <path d="M21 15l-5-5L5 21"/>
+              </svg>
+              <span>タップして写真を選択</span>
+              <span class="file-label-hint">カメラで撮影 または アルバムから選択</span>
+            </label>
+          </div>
+          <div id="preview-myAnswerImages" class="image-preview-container"></div>
+          <div id="count-myAnswerImages" class="hidden"></div>
         </div>
 
         <!-- 解答画像 -->
@@ -651,10 +665,9 @@
         </select>
         <select id="filter-status" class="filter-select" onchange="renderTeacherList()">
           <option value="">全ステータス</option>
-          <option value="submitted" selected>未解決</option>
+          <option value="submitted" selected>対応待ち</option>
           <option value="done">対応完了</option>
         </select>
-        <button id="sort-order-btn" class="sort-btn" onclick="toggleSortOrder()">古い順</button>
       </div>
 
       <!-- カード一覧 -->
