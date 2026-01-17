@@ -982,6 +982,7 @@ function renderStudentDetail(id) {
   } else {
     footer.innerHTML = `
       <button class="btn btn-outline" onclick="navigateTo('student-mypage')">戻る</button>
+      <button class="btn btn-secondary" onclick="editTicket('${ticket.id}')">編集</button>
       <button class="btn btn-primary" onclick="showStudentCompleteModal()">解決した</button>
     `;
   }
@@ -1034,11 +1035,15 @@ function initStudentPage() {
   myAnswerImages = [];
   currentEditingTicketId = null;
   
+  // タイトルをリセット
+  document.getElementById('student-form-title').textContent = '質問登録';
+  
   document.getElementById('preview-questionImages').innerHTML = '';
   document.getElementById('preview-answerImages').innerHTML = '';
   document.getElementById('preview-myAnswerImages').innerHTML = '';
   updateImageCount('question');
   updateImageCount('answer');
+  updateImageCount('myAnswer');
   
   // ログイン情報を設定
   document.getElementById('input-studentId').value = session.id;
@@ -1055,6 +1060,58 @@ function initStudentPage() {
   document.querySelectorAll('.form-error, .form-warning').forEach(el => el.classList.add('hidden'));
   
   setupStudentEventListeners();
+}
+
+/**
+ * 既存のチケットを編集モードで開く
+ */
+function editTicket(ticketId) {
+  const ticket = getTicketById(ticketId);
+  if (!ticket) {
+    showToast('質問が見つかりません', 'error');
+    return;
+  }
+  
+  // フォームページに移動（initStudentPageが呼ばれる）
+  navigateTo('student');
+  
+  // フォームにデータを設定（少し遅延させてDOMの準備を待つ）
+  setTimeout(() => {
+    // 編集モードフラグを設定（initStudentPage後に設定）
+    currentEditingTicketId = ticketId;
+    
+    // タイトルを編集モードに
+    document.getElementById('student-form-title').textContent = '質問を編集';
+    
+    // 教科
+    document.getElementById('input-subject').value = ticket.subject;
+    
+    // 目的
+    document.querySelectorAll('.toggle-btn').forEach(btn => btn.classList.remove('active'));
+    document.querySelector(`[data-purpose="${ticket.purpose}"]`).classList.add('active');
+    document.getElementById('input-purpose').value = ticket.purpose;
+    updateFormByPurpose(ticket.purpose);
+    
+    // チェックボックス
+    document.querySelectorAll('input[name="checkedMaterials"]').forEach(cb => {
+      cb.checked = (ticket.checkedMaterials || []).includes(cb.value);
+    });
+    
+    // 質問内容
+    document.getElementById('input-questionReason').value = ticket.questionReason || '';
+    
+    // 画像を復元
+    questionImages = [...(ticket.questionImages || [])];
+    answerImages = [...(ticket.answerImages || [])];
+    myAnswerImages = [...(ticket.myAnswerImages || [])];
+    
+    renderImagePreviews('question');
+    renderImagePreviews('answer');
+    renderImagePreviews('myAnswer');
+    updateImageCount('question');
+    updateImageCount('answer');
+    updateImageCount('myAnswer');
+  }, 100);
 }
 
 /**
@@ -1907,11 +1964,11 @@ function renderTeacherDetail(id) {
       
       <!-- 先生メモ -->
       <div class="detail-divider"></div>
-      <div class="detail-section-title">メモ</div>
+      <div class="detail-section-title">先生用メモ</div>
       <textarea id="input-teacherMemo" class="form-textarea" rows="3" 
-        placeholder="メモを入力" ${isDone ? 'readonly' : ''}>${escapeHtml(ticket.teacherMemo || '')}</textarea>
+        placeholder="先生用メモを入力" ${isDone ? 'readonly' : ''}>${escapeHtml(ticket.teacherMemo || '')}</textarea>
       ${!isDone ? `
-      <button class="btn btn-memo-save" onclick="saveTeacherMemoWithToast()">メモを保存</button>
+      <button class="btn btn-memo-save" onclick="saveTeacherMemoWithToast()">先生用メモを保存</button>
       ` : ''}
     </div>
   `;
@@ -1962,7 +2019,7 @@ async function saveTeacherMemo() {
  */
 async function saveTeacherMemoWithToast() {
   await saveTeacherMemo();
-  showToast('メモを保存しました');
+  showToast('先生用メモを保存しました');
 }
 
 /**

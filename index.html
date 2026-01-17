@@ -191,7 +191,7 @@
           <path d="M19 12H5M12 19l-7-7 7-7"/>
         </svg>
       </button>
-      <h1 class="header-title">質問登録</h1>
+      <h1 class="header-title" id="student-form-title">質問登録</h1>
       <div class="header-spacer"></div>
     </header>
     
@@ -524,6 +524,9 @@
     </header>
     
     <main class="main-content">
+      <!-- 生徒追加ボタン -->
+      <button class="btn btn-primary btn-block" onclick="showAddStudentModal()" style="margin-bottom: 16px;">生徒を追加</button>
+      
       <!-- クラスフィルタ -->
       <div class="filter-bar">
         <select id="filter-student-class" class="filter-select" onchange="renderStudentList()">
